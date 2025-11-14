@@ -1,0 +1,103 @@
+# 📦 Offline Messenger — Installation Guide (Termux Edition)
+
+This guide explains how to install and run the **Offline Messenger App** using Expo + SQLite **directly on Android using Termux** — **no PC required.**
+
+---
+
+## 🚀 1. Requirements
+
+Before installing, make sure you have:
+
+| Requirement | Status |
+|------------|--------|
+| Android Phone | ✔ |
+| Termux (latest version) | ✔ |
+| Internet connection | ✔ |
+| Expo Go App (from Play Store) | ✔ |
+
+Install Termux from **F-Droid (recommended)**:
+https://f-droid.org/en/packages/com.termux/
+
+---
+
+## 📥 2. Update System
+
+```sh
+pkg update && pkg upgrade -y
+
+🛠 3. Install Required Packages
+pkg install nodejs -y
+pkg install git -y
+
+🌍 4. Install Expo CLI
+npm install -g expo-cli
+
+📦 5. Clone the Repository
+git clone https://github.com/LracAds03/offline-Messenger.git
+cd offline-Messenger
+
+
+Choose the latest branch:
+
+git checkout preview
+
+📚 6. Install Dependencies
+
+Termux may require forcing dependencies:
+
+npm install --force
+
+🗄 7. Database Setup
+
+No manual steps needed — the app automatically creates:
+
+users
+
+messages
+
+SQLite tables the first time it runs.
+
+▶️ 8. Start the App
+
+To launch development mode:
+
+npx expo start --tunnel
+
+
+Then:
+
+Open the Expo Go app on your phone.
+
+Scan the QR code shown in Termux.
+
+The Offline Messenger will open automatically.
+
+📱 9. Build an APK (Optional)
+
+You can generate an installable APK using EAS.
+
+Install EAS:
+npm install -g eas-cli
+
+Configure project:
+eas build:configure
+
+Build APK:
+eas build -p android --profile preview
+
+
+After the build finishes, Expo will give you a download link for the generated .apk.
+
+🧪 10. Testing Changes
+
+Every time you modify the code, simply rerun:
+
+npx expo start --tunnel
+
+
+Expo Go will reload automatically.
+
+🌐 11. Push Updates to GitHub
+git add .
+git commit -m "Updated Offline Messenger"
+git push origin preview
