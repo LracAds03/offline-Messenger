@@ -11,6 +11,7 @@ import RegisterScreen from './screens/RegisterScreen';
 import HomeScreen from './screens/HomeScreen';
 import ChatScreen from './screens/ChatScreen';
 
+
 const Stack = createNativeStackNavigator();
 
 export default function App() {
