@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
+// screens/ChatScreen.js
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,25 +10,29 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-} from 'react-native';
+  Modal,
+} from "react-native";
 
 export default function ChatScreen({ navigation, route, db }) {
   const { currentUser, chatUser } = route.params;
 
   const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
+  const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showImageModal, setShowImageModal] = useState(false);
 
-  const flatListRef = useRef(null);
+  const flatRef = useRef(null);
 
   useEffect(() => {
+    if (!currentUser || !chatUser) {
+      navigation.replace("Home");
+      return;
+    }
+
     loadMessages();
-    markAsRead();
+    markRead();
 
-    const interval = setInterval(() => {
-      loadMessages();
-    }, 1500);
-
+    const interval = setInterval(() => loadMessages(), 1500);
     return () => clearInterval(interval);
   }, []);
 
@@ -35,57 +40,53 @@ export default function ChatScreen({ navigation, route, db }) {
     try {
       const list = await db.getAllAsync(
         `SELECT * FROM messages
-         WHERE (senderId = ? AND receiverId = ?)
-            OR (senderId = ? AND receiverId = ?)
+         WHERE (senderId = ? AND receiverId = ?) 
+         OR (senderId = ? AND receiverId = ?)
          ORDER BY timestamp ASC`,
         [currentUser.id, chatUser.id, chatUser.id, currentUser.id]
       );
-
       setMessages(list);
-    } catch (e) {
-      console.log("Load message error:", e);
+    } catch (err) {
+      console.log("Chat loadMessages error:", err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const markAsRead = async () => {
+  const markRead = async () => {
     try {
       await db.runAsync(
-        `UPDATE messages
-         SET isRead = 1
+        `UPDATE messages SET isRead = 1 
          WHERE senderId = ? AND receiverId = ? AND isRead = 0`,
         [chatUser.id, currentUser.id]
       );
-    } catch (e) {
-      console.log("Mark read error:", e);
+    } catch (err) {
+      // ignore
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim()) return;
+  const send = async () => {
+    if (!text.trim()) return;
 
     try {
       await db.runAsync(
-        `INSERT INTO messages (senderId, receiverId, message)
-         VALUES (?, ?, ?)`,
-        [currentUser.id, chatUser.id, inputText.trim()]
+        `INSERT INTO messages (senderId, receiverId, message, timestamp)
+       VALUES (?, ?, ?, datetime('now','localtime'))`,
+        [currentUser.id, chatUser.id, text.trim()]
       );
-    } catch (e) {
-      console.log("Message send error:", e);
+
+      setText("");
+      await loadMessages();
+
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (err) {
+      console.log("Send message error:", err);
     }
-
-    setInputText('');
-    await loadMessages();
-
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
   };
 
   const formatTime = (ts) => {
     const d = new Date(ts);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   const formatDate = (ts) => {
@@ -96,40 +97,43 @@ export default function ChatScreen({ navigation, route, db }) {
 
     if (d.toDateString() === today.toDateString()) return "Today";
     if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  const renderMessage = ({ item, index }) => {
+  const renderItem = ({ item, index }) => {
     const isMe = item.senderId === currentUser.id;
     const prev = index > 0 ? messages[index - 1] : null;
 
-    const showDate = !prev || formatDate(prev.timestamp) !== formatDate(item.timestamp);
+    const showDate =
+      !prev || formatDate(prev.timestamp) !== formatDate(item.timestamp);
 
     return (
       <>
         {showDate && (
-          <View style={styles.dateHeader}>
+          <View style={styles.dateWrap}>
             <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
           </View>
         )}
 
-        <View
-          style={[
-            styles.messageRow,
-            isMe ? styles.myRow : styles.theirRow
-          ]}
-        >
+        <View style={[styles.row, isMe ? styles.rowMe : styles.rowThem]}>
           <View
-            style={[
-              styles.bubble,
-              isMe ? styles.myBubble : styles.theirBubble
-            ]}
+            style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
           >
-            <Text style={[styles.msgText, isMe ? styles.myText : styles.theirText]}>
+            <Text
+              style={[
+                styles.msgText,
+                isMe ? styles.msgTextMe : styles.msgTextThem,
+              ]}
+            >
               {item.message}
             </Text>
-
-            <Text style={[styles.time, isMe ? styles.myTime : styles.theirTime]}>
+            <Text
+              style={[
+                styles.msgTime,
+                isMe ? styles.msgTimeMe : styles.msgTimeThem,
+              ]}
+            >
               {formatTime(item.timestamp)}
             </Text>
           </View>
@@ -143,58 +147,105 @@ export default function ChatScreen({ navigation, route, db }) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Header */}
+      {/* =======================
+          HEADER
+      ========================== */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backText}>←</Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ marginRight: 12 }}
+        >
+          <Text style={{ color: "#fff", fontSize: 22 }}>←</Text>
         </TouchableOpacity>
 
-        {chatUser.profilePhoto ? (
-          <Image source={{ uri: chatUser.profilePhoto }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLetter}>
-              {chatUser.fullName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
+        {/* Avatar clickable */}
+        <TouchableOpacity onPress={() => setShowImageModal(true)}>
+          {chatUser.profilePhoto ? (
+            <Image
+              source={{ uri: chatUser.profilePhoto }}
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <Text
+                style={{
+                  color: "#007AFF",
+                  fontWeight: "700",
+                }}
+              >
+                {chatUser.fullName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-        <Text style={styles.headerName}>{chatUser.fullName}</Text>
+        <Text style={styles.chatTitle}>{chatUser.fullName}</Text>
       </View>
 
-      {/* Messages */}
+      {/* =======================
+          PROFILE ZOOM MODAL
+      ========================== */}
+      <Modal visible={showImageModal} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowImageModal(false)}
+          >
+            {chatUser.profilePhoto ? (
+              <Image
+                source={{ uri: chatUser.profilePhoto }}
+                style={styles.modalImage}
+              />
+            ) : (
+              <View style={styles.modalPlaceholder}>
+                <Text style={styles.modalLetter}>
+                  {chatUser.fullName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* =======================
+          MESSAGES LIST
+      ========================== */}
       <FlatList
-        ref={flatListRef}
+        ref={flatRef}
         data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContent}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        renderItem={renderItem}
+        keyExtractor={(i) => i.id.toString()}
+        contentContainerStyle={{ padding: 10, paddingBottom: 20 }}
+        onContentSizeChange={() =>
+          flatRef.current?.scrollToEnd({ animated: true })
+        }
         ListEmptyComponent={
           !loading && (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>No messages yet</Text>
-              <Text style={styles.emptySub}>Send a message to begin!</Text>
+            <View style={{ padding: 40, alignItems: "center" }}>
+              <Text style={{ color: "#666" }}>No messages yet</Text>
             </View>
           )
         }
       />
 
-      {/* Input */}
+      {/* =======================
+          INPUT
+      ========================== */}
       <View style={styles.inputRow}>
         <TextInput
-          style={styles.input}
-          value={inputText}
+          value={text}
+          onChangeText={setText}
           placeholder="Type a message..."
-          onChangeText={setInputText}
+          style={styles.input}
           multiline
         />
         <TouchableOpacity
-          style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-          disabled={!inputText.trim()}
-          onPress={sendMessage}
+          onPress={send}
+          style={[styles.sendBtn, !text.trim() && { backgroundColor: "#aaa" }]}
+          disabled={!text.trim()}
         >
-          <Text style={styles.sendText}>Send</Text>
+          <Text style={{ color: "#fff", fontWeight: "700" }}>Send</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -208,86 +259,119 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#007AFF",
-    padding: 15,
     paddingTop: 50,
+    padding: 12,
   },
 
-  backButton: { marginRight: 12 },
-  backText: { fontSize: 26, color: "#fff" },
-
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "#e2e2e2",
   },
 
-  avatarLetter: { fontWeight: "bold", fontSize: 16, color: "#007AFF" },
+  chatTitle: { color: "#fff", fontWeight: "700", fontSize: 16 },
 
-  headerName: { color: "#fff", fontSize: 17, fontWeight: "600" },
-
-  listContent: { padding: 10 },
-
-  dateHeader: { alignItems: "center", marginVertical: 10 },
+  dateWrap: { alignItems: "center", marginVertical: 8 },
   dateText: {
-    backgroundColor: "#ddd",
-    paddingHorizontal: 12,
+    backgroundColor: "#e8e8e8",
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
-    color: "#555",
-    fontSize: 12,
+    borderRadius: 12,
+    color: "#666",
   },
 
-  messageRow: { marginVertical: 4, maxWidth: "75%" },
-  myRow: { alignSelf: "flex-end" },
-  theirRow: { alignSelf: "flex-start" },
+  row: { marginVertical: 6, maxWidth: "75%" },
+  rowMe: { alignSelf: "flex-end" },
+  rowThem: { alignSelf: "flex-start" },
 
   bubble: { padding: 10, borderRadius: 14 },
-  myBubble: { backgroundColor: "#007AFF", borderBottomRightRadius: 4 },
-  theirBubble: { backgroundColor: "#fff", borderBottomLeftRadius: 4 },
+  bubbleMe: { backgroundColor: "#007AFF", borderBottomRightRadius: 4 },
+  bubbleThem: { backgroundColor: "#fff", borderBottomLeftRadius: 4 },
 
   msgText: { fontSize: 16 },
-  myText: { color: "#fff" },
-  theirText: { color: "#000" },
+  msgTextMe: { color: "#fff" },
+  msgTextThem: { color: "#000" },
 
-  time: { fontSize: 11, marginTop: 4 },
-  myTime: { color: "rgba(255,255,255,0.7)", textAlign: "right" },
-  theirTime: { color: "#888" },
+  msgTime: { fontSize: 11, marginTop: 6 },
+  msgTimeMe: { color: "rgba(255,255,255,0.8)", textAlign: "right" },
+  msgTimeThem: { color: "#777" },
 
   inputRow: {
     flexDirection: "row",
-    padding: 10,
+    padding: 12,
     backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: "#ddd",
+    borderColor: "#ddd",
+    alignItems: "flex-end",
   },
 
   input: {
     flex: 1,
-    backgroundColor: "#f1f1f1",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 20,
-    maxHeight: 100,
-    fontSize: 16,
+    backgroundColor: "#f0f0f5",
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    fontSize: 17,
+    maxHeight: 140,
+    color: "#333",
   },
 
   sendBtn: {
     backgroundColor: "#007AFF",
-    marginLeft: 10,
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    borderRadius: 25,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
   },
 
-  sendBtnDisabled: { backgroundColor: "#aaa" },
+  /* =======================
+        FULLSCREEN MODAL
+  ========================== */
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
-  sendText: { color: "#fff", fontWeight: "600" },
+  modalBackdrop: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
-  emptyBox: { alignItems: "center", padding: 40 },
-  emptyText: { fontSize: 18, color: "#666" },
-  emptySub: { fontSize: 14, color: "#999", marginTop: 4 },
+  modalImage: {
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    resizeMode: "cover",
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
+
+  modalPlaceholder: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
+
+  modalLetter: {
+    fontSize: 90,
+    fontWeight: "700",
+    color: "#fff",
+  },
 });

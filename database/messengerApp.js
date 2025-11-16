@@ -21,7 +21,7 @@ export async function createDatabase() {
       senderId INTEGER NOT NULL,
       receiverId INTEGER NOT NULL,
       message TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      timestamp DATETIME DEFAULT (datetime('now', 'localtime')),
       isRead INTEGER DEFAULT 0
     );
   `);

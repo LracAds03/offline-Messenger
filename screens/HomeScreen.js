@@ -1,72 +1,82 @@
-import React, { useEffect, useState } from 'react';
+// screens/HomeScreen.js
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
+  ActivityIndicator,
   Image,
-} from 'react-native';
+  Alert,
+} from "react-native";
 
 export default function HomeScreen({ navigation, route, db }) {
-  const { currentUser } = route.params;
+  // route.params.currentUser is set when navigating from Login/Register or replaced
+  const currentUser = route.params?.currentUser || null;
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    // If currentUser is not provided, navigate back to Login
+    if (!currentUser) {
+      navigation.replace("Login");
+      return;
+    }
+
+    const unsub = navigation.addListener("focus", () => {
+      // reload every time screen is focused (so profile updates reflect)
+      loadUsers();
+    });
+
     loadUsers();
-  }, []);
+    return unsub;
+  }, [navigation, currentUser]);
 
   const loadUsers = async () => {
     try {
       const list = await db.getAllAsync(
-        `SELECT id, username, fullName, profilePhoto 
-         FROM users 
+        `SELECT id, username, fullName, profilePhoto
+         FROM users
          WHERE id != ?
          ORDER BY fullName`,
         [currentUser.id]
       );
 
       const enhanced = await Promise.all(
-        list.map(async (user) => {
-          const lastMessage = await db.getFirstAsync(
+        list.map(async (u) => {
+          const last = await db.getFirstAsync(
             `SELECT message, timestamp, senderId
              FROM messages
-             WHERE (senderId = ? AND receiverId = ?)
-                OR (senderId = ? AND receiverId = ?)
-             ORDER BY timestamp DESC
-             LIMIT 1`,
-            [currentUser.id, user.id, user.id, currentUser.id]
+             WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
+             ORDER BY timestamp DESC LIMIT 1`,
+            [currentUser.id, u.id, u.id, currentUser.id]
           );
-
           const unread = await db.getFirstAsync(
-            `SELECT COUNT(*) AS count 
-             FROM messages
-             WHERE senderId = ? AND receiverId = ? AND isRead = 0`,
-            [user.id, currentUser.id]
+            `SELECT COUNT(*) AS count FROM messages WHERE senderId = ? AND receiverId = ? AND isRead = 0`,
+            [u.id, currentUser.id]
           );
 
           return {
-            ...user,
-            lastMessage: lastMessage?.message || "No messages yet",
-            lastMessageTime: lastMessage?.timestamp || null,
+            ...u,
+            lastMessage: last?.message || "No messages yet",
+            lastMessageTime: last?.timestamp || null,
+            isYou: last?.senderId === currentUser.id,
             unreadCount: unread?.count || 0,
-            isYou: lastMessage?.senderId === currentUser.id,
           };
         })
       );
 
       setUsers(enhanced);
-    } catch (error) {
-      console.log("Load users error:", error);
+    } catch (err) {
+      console.log("Home loadUsers error:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-
-    setLoading(false);
-    setRefreshing(false);
   };
 
   const onRefresh = () => {
@@ -74,59 +84,68 @@ export default function HomeScreen({ navigation, route, db }) {
     loadUsers();
   };
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return "";
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(hours / 24);
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return days === 1 ? "Yesterday" : `${days}d ago`;
-  };
-
   const openChat = (user) => {
     navigation.navigate("Chat", { currentUser, chatUser: user });
   };
 
-  const logout = () => {
-    navigation.replace("Login");
+  const openProfile = () => {
+    navigation.navigate("Profile", { currentUser });
   };
 
-  const renderUser = ({ item }) => (
-    <TouchableOpacity style={styles.userItem} onPress={() => openChat(item)}>
+  const logout = () => {
+    Alert.alert("Logout", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: () => navigation.replace("Login"),
+      },
+    ]);
+  };
+
+  const formatTime = (timestamp) => {
+    if (!timestamp) return "";
+    const d = new Date(timestamp);
+    const now = new Date();
+    const diff = now - d;
+    const m = Math.floor(diff / 60000);
+    const h = Math.floor(diff / 3600000);
+    const days = Math.floor(h / 24);
+    if (m < 1) return "Just now";
+    if (m < 60) return `${m}m ago`;
+    if (h < 24) return `${h}h ago`;
+    return days === 1 ? "Yesterday" : `${days}d ago`;
+  };
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity style={styles.userRow} onPress={() => openChat(item)}>
       {item.profilePhoto ? (
-        <Image source={{ uri: item.profilePhoto }} style={styles.avatarImg} />
+        <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
       ) : (
-        <View style={styles.avatarImg}>
-          <Text style={styles.avatarText}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarLetter}>
             {item.fullName.charAt(0).toUpperCase()}
           </Text>
         </View>
       )}
 
-      <View style={styles.userInfo}>
-        <View style={styles.userHeader}>
-          <Text style={styles.userName}>{item.fullName}</Text>
-
+      <View style={styles.info}>
+        <View style={styles.infoTop}>
+          <Text style={styles.name}>{item.fullName}</Text>
           {item.lastMessageTime && (
-            <Text style={styles.timestamp}>{formatTime(item.lastMessageTime)}</Text>
+            <Text style={styles.time}>{formatTime(item.lastMessageTime)}</Text>
           )}
         </View>
 
-        <View style={styles.messageRow}>
-          <Text numberOfLines={1} style={styles.lastMessage}>
-            {item.isYou ? "You: " : ""}{item.lastMessage}
+        <View style={styles.infoBottom}>
+          <Text numberOfLines={1} style={styles.preview}>
+            {item.isYou ? "You: " : ""}
+            {item.lastMessage}
           </Text>
 
           {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{item.unreadCount}</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{item.unreadCount}</Text>
             </View>
           )}
         </View>
@@ -136,7 +155,7 @@ export default function HomeScreen({ navigation, route, db }) {
 
   if (loading) {
     return (
-      <View style={styles.loadingScreen}>
+      <View style={styles.center}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
@@ -146,23 +165,41 @@ export default function HomeScreen({ navigation, route, db }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <Text style={styles.headerSubtitle}>Welcome, {currentUser.fullName}!</Text>
+        <TouchableOpacity onPress={openProfile}>
+          {currentUser.profilePhoto ? (
+            <Image
+              source={{ uri: currentUser.profilePhoto }}
+              style={styles.headerAvatar}
+            />
+          ) : (
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerLetter}>
+                {currentUser.fullName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <View style={{ flex: 1, marginLeft: 12 }}>          
+          <Text style={styles.subtitle}>Welcome, {currentUser.fullName}</Text>
+          <Text style={styles.title}>Messages</Text>
+        </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Users List */}
       <FlatList
         data={users}
-        renderItem={renderUser}
-        keyExtractor={(item) => item.id.toString()}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        renderItem={renderItem}
+        keyExtractor={(i) => i.id.toString()}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
-          <View style={styles.emptyList}>
-            <Text style={styles.emptyText}>No other users yet</Text>
+          <View style={{ padding: 40, alignItems: "center" }}>
+            <Text style={{ color: "#777" }}>No other users found</Text>
           </View>
         }
       />
@@ -172,62 +209,79 @@ export default function HomeScreen({ navigation, route, db }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
-
-  loadingScreen: {
-    flex: 1, justifyContent: "center", alignItems: "center"
-  },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   header: {
-    backgroundColor: "#007AFF",
-    padding: 20,
-    paddingTop: 50,
-  },
-  headerTitle: {
-    fontSize: 28, color: "#fff", fontWeight: "bold",
-  },
-  headerSubtitle: {
-    fontSize: 14, color: "#fff", opacity: 0.85,
-  },
-  logoutButton: {
-    position: "absolute", right: 20, top: 50,
-  },
-  logoutText: {
-    color: "#fff", fontWeight: "600",
-  },
-
-  userItem: {
     flexDirection: "row",
-    padding: 15,
+    alignItems: "center",
+    backgroundColor: "#007AFF",
+    paddingTop: 50,
+    paddingBottom: 18,
+    paddingHorizontal: 18,
+  },
+  headerAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  headerLetter: { color: "#007AFF", fontWeight: "700", fontSize: 20 },
+  title: { color: "#fff", fontSize: 22, fontWeight: "700" },
+  subtitle: { color: "#fff", opacity: 0.9, marginTop: 2 },
+
+  logoutButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  logoutText: {
+    color: "#ffffff", // ← FIXED!
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  userRow: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    padding: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderColor: "#eee",
   },
-
-  avatarImg: {
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: "#007AFF", justifyContent: "center",
-    alignItems: "center", marginRight: 12,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
-  avatarText: {
-    color: "#fff", fontSize: 22, fontWeight: "700",
+  avatarLetter: { color: "#fff", fontWeight: "700", fontSize: 18 },
+
+  info: { flex: 1 },
+  infoTop: { flexDirection: "row", justifyContent: "space-between" },
+  name: { fontWeight: "700", fontSize: 16 },
+  time: { color: "#888", fontSize: 12 },
+
+  infoBottom: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
   },
+  preview: { color: "#666", flex: 1 },
 
-  userInfo: { flex: 1 },
-  userHeader: { flexDirection: "row", justifyContent: "space-between" },
-  userName: { fontSize: 16, fontWeight: "600" },
-  timestamp: { fontSize: 12, color: "#999" },
-
-  messageRow: {
-    flexDirection: "row", justifyContent: "space-between", marginTop: 2,
+  badge: {
+    backgroundColor: "#007AFF",
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    marginLeft: 8,
   },
-  lastMessage: { color: "#555", flex: 1 },
-
-  unreadBadge: {
-    backgroundColor: "#007AFF", paddingHorizontal: 8,
-    borderRadius: 10, justifyContent: "center", alignItems: "center",
-  },
-  unreadText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-
-  emptyList: { padding: 40, alignItems: "center" },
-  emptyText: { fontSize: 16, color: "#999" },
+  badgeText: { color: "#fff", fontWeight: "700", fontSize: 12 },
 });

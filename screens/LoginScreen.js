@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform
 } from 'react-native';
 
 export default function LoginScreen({ navigation, db }) {
@@ -31,24 +25,22 @@ export default function LoginScreen({ navigation, db }) {
 
       if (user) {
         Alert.alert('Success', `Welcome back, ${user.fullName}!`);
-
         navigation.replace("Home", { currentUser: user });
       } else {
         Alert.alert('Error', 'Invalid username or password');
       }
 
     } catch (error) {
-      console.error('Login error:', error);
-      Alert.alert('Error', 'Failed to login. Please try again.');
-    } finally {
-      setIsLoading(false);
+      Alert.alert('Error', 'Login failed.');
+      console.log("Login Error:", error);
     }
+
+    setIsLoading(false);
   };
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAvoidingView style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
     >
       <View style={styles.content}>
         <Text style={styles.title}>Offline Messenger</Text>
@@ -57,18 +49,18 @@ export default function LoginScreen({ navigation, db }) {
         <TextInput
           style={styles.input}
           placeholder="Username"
+          autoCapitalize="none"
           value={username}
           onChangeText={setUsername}
-          autoCapitalize="none"
           editable={!isLoading}
         />
 
         <TextInput
           style={styles.input}
           placeholder="Password"
+          secureTextEntry
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
           editable={!isLoading}
         />
 
@@ -78,13 +70,12 @@ export default function LoginScreen({ navigation, db }) {
           disabled={isLoading}
         >
           <Text style={styles.buttonText}>
-            {isLoading ? 'Logging in...' : 'Login'}
+            {isLoading ? "Logging in..." : "Login"}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => navigation.navigate('Register')}
-          disabled={isLoading}
+          onPress={() => navigation.navigate("Register")}
           style={styles.linkContainer}
         >
           <Text style={styles.linkText}>
@@ -97,63 +88,21 @@ export default function LoginScreen({ navigation, db }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
+  container: { flex:1, backgroundColor:'#fff' },
+  content: { flex:1, justifyContent:'center', padding:20 },
+  title: { fontSize:32, fontWeight:'bold', color:'#007AFF', textAlign:'center' },
+  subtitle: { textAlign:'center', color:'#666', marginBottom:20 },
   input: {
-    height: 50,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    fontSize: 16,
+    height:50, borderColor:'#ddd', borderWidth:1,
+    borderRadius:8, paddingHorizontal:15, marginBottom:15
   },
   button: {
-    backgroundColor: '#007AFF',
-    height: 50,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
+    backgroundColor:'#007AFF', height:50, justifyContent:'center',
+    alignItems:'center', borderRadius:8
   },
-  buttonDisabled: {
-    backgroundColor: '#999',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  linkContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  linkText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  linkBold: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
+  buttonDisabled:{ backgroundColor:'#999' },
+  buttonText:{ color:'#fff', fontSize:18, fontWeight:'600' },
+  linkContainer:{ marginTop:20, alignItems:'center' },
+  linkText:{ color:'#666' },
+  linkBold:{ color:'#007AFF', fontWeight:'bold' }
 });
