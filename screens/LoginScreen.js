@@ -25,7 +25,7 @@ export default function LoginScreen({ navigation, db }) {
 
       if (user) {
         Alert.alert('Success', `Welcome back, ${user.fullName}!`);
-        navigation.replace("Home", { currentUser: user });
+        navigation.replace("Tabs", { currentUser: user,db });
       } else {
         Alert.alert('Error', 'Invalid username or password');
       }
@@ -43,7 +43,7 @@ export default function LoginScreen({ navigation, db }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Offline Messenger</Text>
+        <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>Login to your account</Text>
 
         <TextInput

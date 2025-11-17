@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "messenger",
-    "slug": "offline-messenger",
+    "name": "Offline Messenger",
+    "slug": "Romanda_C",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#007AFF"
     },
     "android": {
