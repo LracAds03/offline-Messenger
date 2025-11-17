@@ -43,8 +43,10 @@ export default function LoginScreen({ navigation, db }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.content}>
+
+        <Text style={styles.logo}>💬</Text>
         <Text style={styles.title}>Offline Messenger</Text>
-        <Text style={styles.subtitle}>Login to your account</Text>
+        <Text style={styles.subtitle}>Welcome back 👋</Text>
 
         <TextInput
           style={styles.input}
@@ -87,22 +89,75 @@ export default function LoginScreen({ navigation, db }) {
   );
 }
 
+// -------------------- New Bubble UI Styling --------------------
 const styles = StyleSheet.create({
-  container: { flex:1, backgroundColor:'#fff' },
-  content: { flex:1, justifyContent:'center', padding:20 },
-  title: { fontSize:32, fontWeight:'bold', color:'#007AFF', textAlign:'center' },
-  subtitle: { textAlign:'center', color:'#666', marginBottom:20 },
+  container: { flex: 1, backgroundColor: "#F9FFFE" },
+
+  content: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 25,
+    alignItems: "center",
+  },
+
+  logo: {
+    fontSize: 50,
+    marginBottom: 5,
+  },
+
+  title: {
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#00A8E8",
+    textAlign: "center",
+  },
+
+  subtitle: {
+    textAlign: "center",
+    color: "#666",
+    fontSize: 15,
+    marginBottom: 25,
+  },
+
   input: {
-    height:50, borderColor:'#ddd', borderWidth:1,
-    borderRadius:8, paddingHorizontal:15, marginBottom:15
+    width: "90%",
+    height: 55,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#A0FFE6",
+    borderRadius: 30,
+    paddingHorizontal: 18,
+    marginBottom: 15,
+    fontSize: 15,
   },
+
   button: {
-    backgroundColor:'#007AFF', height:50, justifyContent:'center',
-    alignItems:'center', borderRadius:8
+    width: "90%",
+    backgroundColor: "#00F5C6",
+    height: 55,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 30,
+    marginTop: 10,
+    elevation: 3,
   },
-  buttonDisabled:{ backgroundColor:'#999' },
-  buttonText:{ color:'#fff', fontSize:18, fontWeight:'600' },
-  linkContainer:{ marginTop:20, alignItems:'center' },
-  linkText:{ color:'#666' },
-  linkBold:{ color:'#007AFF', fontWeight:'bold' }
+
+  buttonDisabled: {
+    backgroundColor: "#9DEADB",
+  },
+
+  buttonText: {
+    color: "#003E32",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  linkContainer: { marginTop: 20 },
+
+  linkText: { color: "#444", fontSize: 15 },
+
+  linkBold: {
+    color: "#00A8E8",
+    fontWeight: "900",
+  },
 });

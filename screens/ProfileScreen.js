@@ -22,9 +22,6 @@ export default function ProfileScreen({ navigation, route, db }) {
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
 
-  // ----------------------------------------------------------
-  // 📌 New: When clicking "Save Photo" → ask Camera or Gallery
-  // ----------------------------------------------------------
   const chooseImageMethod = () => {
     Alert.alert("Change Photo", "Select option", [
       { text: "📁 Gallery", onPress: pickImage },
@@ -43,7 +40,7 @@ export default function ProfileScreen({ navigation, route, db }) {
       });
       if (!res.canceled) setProfilePhoto(res.assets[0].uri);
     } catch {
-      Alert.alert("Error", "Failed to select from gallery");
+      Alert.alert("Error", "Gallery not available");
     }
   };
 
@@ -56,12 +53,12 @@ export default function ProfileScreen({ navigation, route, db }) {
       });
       if (!res.canceled) setProfilePhoto(res.assets[0].uri);
     } catch {
-      Alert.alert("Error", "Camera not available");
+      Alert.alert("Error", "Camera failed");
     }
   };
 
   const saveProfilePhoto = async () => {
-    if (!profilePhoto) return Alert.alert("No Image", "Please take or select a photo first.");
+    if (!profilePhoto) return Alert.alert("No Image", "Please select an image first.");
 
     await db.runAsync("UPDATE users SET profilePhoto = ? WHERE id = ?", [
       profilePhoto,
@@ -72,7 +69,7 @@ export default function ProfileScreen({ navigation, route, db }) {
       currentUser.id,
     ]);
 
-    Alert.alert("Success", "Profile picture updated!");
+    Alert.alert("Success", "Profile updated!");
     navigation.replace("Profile", { currentUser: updated });
   };
 
@@ -88,41 +85,34 @@ export default function ProfileScreen({ navigation, route, db }) {
       currentUser.id,
     ]);
 
-    Alert.alert("Success", "Name updated");
+    Alert.alert("Updated", "Full name saved!");
     navigation.replace("Profile", { currentUser: updated });
   };
 
   const changePassword = async () => {
-    if (!oldPass || !newPass)
-      return Alert.alert("Error", "Please fill both fields");
-    if (oldPass !== currentUser.password)
-      return Alert.alert("Error", "Old password incorrect");
-    if (newPass.length < 4)
-      return Alert.alert("Error", "Password too short");
+    if (!oldPass || !newPass) return Alert.alert("Error", "Fields cannot be empty");
+    if (oldPass !== currentUser.password) return Alert.alert("Error", "Old password incorrect");
+    if (newPass.length < 4) return Alert.alert("Error", "Min 4 characters");
 
-    await db.runAsync("UPDATE users SET password = ? WHERE id = ?", [
-      newPass,
-      currentUser.id,
-    ]);
+    await db.runAsync("UPDATE users SET password = ? WHERE id = ?", [newPass, currentUser.id]);
 
-    Alert.alert("Success", "Password updated");
+    Alert.alert("Success", "Password updated!");
     setOldPass("");
     setNewPass("");
   };
 
   const deleteAccount = () => {
-    Alert.alert("Delete Account", "Are you sure?", [
+    Alert.alert("Delete Account", "This action is permanent!", [
       { text: "Cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
-          await db.runAsync(
-            "DELETE FROM messages WHERE senderId = ? OR receiverId = ?",
-            [currentUser.id, currentUser.id]
-          );
-          await db.runAsync("DELETE FROM users WHERE id = ?", [currentUser.id]);
-          Alert.alert("Deleted", "Your account has been removed");
+          await db.runAsync("DELETE FROM messages WHERE senderId=? OR receiverId=?", [
+            currentUser.id,
+            currentUser.id,
+          ]);
+          await db.runAsync("DELETE FROM users WHERE id=?", [currentUser.id]);
           navigation.replace("Login");
         },
       },
@@ -130,180 +120,155 @@ export default function ProfileScreen({ navigation, route, db }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView contentContainerStyle={styles.centerContent}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={styles.center}>
         
-        {/* Back Button */}
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Back</Text>
+        {/* Back button */}
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backIcon}>⬅</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>My Profile</Text>
+        <Text style={styles.title}>Profile</Text>
 
-        {/* Profile Image */}
+        {/* Photo */}
         <TouchableOpacity onPress={chooseImageMethod}>
           {profilePhoto ? (
             <Image source={{ uri: profilePhoto }} style={styles.photo} />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoLetter}>{currentUser.fullName[0].toUpperCase()}</Text>
+              <Text style={styles.photoLetter}>{currentUser.fullName[0]}</Text>
             </View>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={saveProfilePhoto}>
-          <Text style={styles.saveText}>Save Photo</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={saveProfilePhoto}>
+          <Text style={styles.actionText}>Save Photo</Text>
         </TouchableOpacity>
 
-        {/* Name Field */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Full Name</Text>
+        {/* Full Name */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Full Name</Text>
           <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
-          <TouchableOpacity style={styles.saveBtn} onPress={saveFullName}>
-            <Text style={styles.saveText}>Update Name</Text>
+          <TouchableOpacity style={styles.smallBtn} onPress={saveFullName}>
+            <Text style={styles.smallBtnText}>Save</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Password Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Change Password</Text>
-          <TextInput placeholder="Old password" secureTextEntry value={oldPass} onChangeText={setOldPass} style={styles.input} />
-          <TextInput placeholder="New password" secureTextEntry value={newPass} onChangeText={setNewPass} style={styles.input} />
-          <TouchableOpacity style={styles.saveBtn} onPress={changePassword}>
-            <Text style={styles.saveText}>Update Password</Text>
+        {/* Change Password */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Change Password</Text>
+          <TextInput placeholder="Old password" secureTextEntry style={styles.input} value={oldPass} onChangeText={setOldPass} />
+          <TextInput placeholder="New password" secureTextEntry style={styles.input} value={newPass} onChangeText={setNewPass} />
+          <TouchableOpacity style={styles.smallBtn} onPress={changePassword}>
+            <Text style={styles.smallBtnText}>Save</Text>
           </TouchableOpacity>
         </View>
 
         {/* Delete Account */}
         <TouchableOpacity style={styles.deleteBtn} onPress={deleteAccount}>
-          <Text style={styles.deleteText}>Delete Account</Text>
+          <Text style={styles.deleteText}>Delete Account ❌</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-// ------------------- UI Improvement (only styling changed) -------------------
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F9FC",
-  },
+  container: { flex: 1, backgroundColor: "#EFFFFA" },
 
-  centerContent: {
+  center: {
     alignItems: "center",
-    paddingBottom: 50,
-    paddingTop: 110,
+    paddingBottom: 80,
+    paddingTop: 100,
   },
 
-  backButton: {
-    position: "absolute",
-    top: 55,
-    left: 20,
-    zIndex: 999,
-  },
-  backText: {
-    fontSize: 18,
-    color: "#007AFF",
-    fontWeight: "600",
-  },
+  backBtn: { position: "absolute", top: 50, left: 15 },
+  backIcon: { fontSize: 26, fontWeight: "bold", color: "#00A38C" },
 
   title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#007AFF",
+    fontSize: 30,
+    fontWeight: "900",
+    color: "#00BFA5",
+    textShadowColor: "#A8FFF2",
+    textShadowRadius: 12,
     marginBottom: 20,
   },
 
   photo: {
-    width: 130,
-    height: 130,
-    borderRadius: 70,
-    borderWidth: 3,
-    borderColor: "#007AFF",
-    marginBottom: 10,
-    backgroundColor: "#E4EAF2",
+    width: 145,
+    height: 145,
+    borderRadius: 75,
+    borderWidth: 4,
+    borderColor: "#00E6C2",
   },
 
   photoPlaceholder: {
-    width: 130,
-    height: 130,
-    borderRadius: 70,
-    backgroundColor: "#DCE4ED",
+    width: 145,
+    height: 145,
+    borderRadius: 75,
+    backgroundColor: "#BFF8E6",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#007AFF",
+    borderWidth: 3,
+    borderColor: "#00E6C2",
   },
 
-  photoLetter: {
-    fontSize: 52,
-    fontWeight: "900",
-    color: "#007AFF",
-  },
+  photoLetter: { fontSize: 60, fontWeight: "900", color: "#008C72" },
 
-  // Save button (for photo + name + password)
-  saveBtn: {
-    backgroundColor: "#007AFF",
+  actionBtn: {
+    backgroundColor: "#00C9A7",
     paddingVertical: 12,
-    paddingHorizontal: 40,
-    borderRadius: 12,
+    paddingHorizontal: 50,
+    borderRadius: 25,
     marginTop: 10,
+    elevation: 2,
   },
 
-  saveText: {
-    color: "#fff",
-    fontWeight: "700",
-    textAlign: "center",
-    fontSize: 16,
-  },
+  actionText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
-  /** Profile Card Sections */
-  section: {
-    width: "85%",
+  card: {
+    width: "87%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    borderRadius: 25,
     padding: 18,
-    marginTop: 20,
+    marginTop: 25,
     elevation: 3,
   },
 
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
-  },
+  label: { fontSize: 16, fontWeight: "700", marginBottom: 8, color: "#004D45" },
 
   input: {
-    width: "100%",
     borderWidth: 1,
-    borderColor: "#D4D6DB",
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: "#F9FAFB",
-    marginBottom: 12,
+    borderColor: "#C9FFF0",
+    backgroundColor: "#F6FFFC",
+    borderRadius: 15,
+    padding: 14,
+    marginBottom: 15,
     fontSize: 15,
   },
 
-  deleteBtn: {
-    backgroundColor: "#FF3B30",
-    width: "80%",
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 35,
-    elevation: 4,
+  smallBtn: {
+    backgroundColor: "#00C9A7",
+    paddingVertical: 10,
+    width: 85,
+    borderRadius: 20,
+    alignSelf: "flex-end",
   },
 
-  deleteText: {
+  smallBtnText: {
     textAlign: "center",
     color: "#fff",
     fontWeight: "700",
-    fontSize: 16,
+    fontSize: 14,
   },
-});
 
+  deleteBtn: {
+    marginTop: 35,
+    backgroundColor: "#FF4D4D",
+    paddingVertical: 14,
+    width: "80%",
+    borderRadius: 25,
+  },
+
+  deleteText: { color: "#fff", fontSize: 16, fontWeight: "700", textAlign: "center" },
+});

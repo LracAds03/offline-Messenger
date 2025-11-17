@@ -13,7 +13,6 @@ import {
 } from "react-native";
 
 export default function HomeScreen({ navigation, route, db }) {
-  // route.params.currentUser is set when navigating from Login/Register or replaced
   const currentUser = route.params?.currentUser || null;
 
   const [users, setUsers] = useState([]);
@@ -21,14 +20,12 @@ export default function HomeScreen({ navigation, route, db }) {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    // If currentUser is not provided, navigate back to Login
     if (!currentUser) {
       navigation.replace("Login");
       return;
     }
 
     const unsub = navigation.addListener("focus", () => {
-      // reload every time screen is focused (so profile updates reflect)
       loadUsers();
     });
 
@@ -51,12 +48,13 @@ export default function HomeScreen({ navigation, route, db }) {
           const last = await db.getFirstAsync(
             `SELECT message, timestamp, senderId
              FROM messages
-             WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
+             WHERE (senderId=? AND receiverId=?) OR (senderId=? AND receiverId=?)
              ORDER BY timestamp DESC LIMIT 1`,
             [currentUser.id, u.id, u.id, currentUser.id]
           );
+
           const unread = await db.getFirstAsync(
-            `SELECT COUNT(*) AS count FROM messages WHERE senderId = ? AND receiverId = ? AND isRead = 0`,
+            `SELECT COUNT(*) AS count FROM messages WHERE senderId=? AND receiverId=? AND isRead=0`,
             [u.id, currentUser.id]
           );
 
@@ -71,8 +69,6 @@ export default function HomeScreen({ navigation, route, db }) {
       );
 
       setUsers(enhanced);
-    } catch (err) {
-      console.log("Home loadUsers error:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -84,60 +80,41 @@ export default function HomeScreen({ navigation, route, db }) {
     loadUsers();
   };
 
-  const openChat = (user) => {
-    navigation.navigate("Chat", { currentUser, chatUser: user });
-  };
-
-  const openProfile = () => {
-    navigation.navigate("Profile", { currentUser });
-  };
+  const openChat = (user) => navigation.navigate("Chat", { currentUser, chatUser: user });
+  const openProfile = () => navigation.navigate("Profile", { currentUser });
 
   const logout = () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
+    Alert.alert("Logout", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: () => navigation.replace("Login"),
-      },
+      { text: "Logout", style: "destructive", onPress: () => navigation.replace("Login") },
     ]);
   };
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const d = new Date(timestamp);
-    const now = new Date();
-    const diff = now - d;
-    const m = Math.floor(diff / 60000);
-    const h = Math.floor(diff / 3600000);
-    const days = Math.floor(h / 24);
-    if (m < 1) return "Just now";
-    if (m < 60) return `${m}m ago`;
-    if (h < 24) return `${h}h ago`;
-    return days === 1 ? "Yesterday" : `${days}d ago`;
+    const h = d.getHours().toString().padStart(2, "0");
+    const m = d.getMinutes().toString().padStart(2, "0");
+    return `${h}:${m}`;
   };
 
   const renderItem = ({ item }) => (
-    <TouchableOpacity style={styles.userRow} onPress={() => openChat(item)}>
+    <TouchableOpacity style={styles.chatCard} onPress={() => openChat(item)} activeOpacity={0.8}>
       {item.profilePhoto ? (
         <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
       ) : (
         <View style={styles.avatar}>
-          <Text style={styles.avatarLetter}>
-            {item.fullName.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.avatarLetter}>{item.fullName.charAt(0).toUpperCase()}</Text>
         </View>
       )}
 
-      <View style={styles.info}>
-        <View style={styles.infoTop}>
+      <View style={{ flex: 1 }}>
+        <View style={styles.rowTop}>
           <Text style={styles.name}>{item.fullName}</Text>
-          {item.lastMessageTime && (
-            <Text style={styles.time}>{formatTime(item.lastMessageTime)}</Text>
-          )}
+          {item.lastMessageTime && <Text style={styles.time}>{formatTime(item.lastMessageTime)}</Text>}
         </View>
 
-        <View style={styles.infoBottom}>
+        <View style={styles.rowBottom}>
           <Text numberOfLines={1} style={styles.preview}>
             {item.isYou ? "You: " : ""}
             {item.lastMessage}
@@ -156,132 +133,117 @@ export default function HomeScreen({ navigation, route, db }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#00C9A7" />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      
+      {/* 🟢 Soft Bubble Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={openProfile}>
-          {currentUser.profilePhoto ? (
-            <Image
-              source={{ uri: currentUser.profilePhoto }}
-              style={styles.headerAvatar}
-            />
+        <TouchableOpacity onPress={openProfile} activeOpacity={0.7}>
+          {currentUser?.profilePhoto ? (
+            <Image source={{ uri: currentUser.profilePhoto }} style={styles.headerAvatar} />
           ) : (
             <View style={styles.headerAvatar}>
-              <Text style={styles.headerLetter}>
-                {currentUser.fullName.charAt(0).toUpperCase()}
-              </Text>
+              <Text style={styles.headerLetter}>{currentUser.fullName[0]}</Text>
             </View>
           )}
         </TouchableOpacity>
 
-        <View style={{ flex: 1, marginLeft: 12 }}>          
-          <Text style={styles.subtitle}>Welcome, {currentUser.fullName}</Text>
-          <Text style={styles.title}>Messages</Text>
+        <View>
+          <Text style={styles.headerSub}>👋 Welcome</Text>
+          <Text style={styles.headerTitle}>{currentUser.fullName}</Text>
         </View>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>🚪</Text>
         </TouchableOpacity>
       </View>
 
+      {/* User List */}
       <FlatList
         data={users}
         renderItem={renderItem}
         keyExtractor={(i) => i.id.toString()}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={{ padding: 40, alignItems: "center" }}>
-            <Text style={{ color: "#777" }}>No other users found</Text>
-          </View>
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={<Text style={styles.empty}>Nobody here 😅</Text>}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
+  container: { flex: 1, backgroundColor: "#EFFFFA" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#007AFF",
     paddingTop: 50,
     paddingBottom: 18,
     paddingHorizontal: 18,
+    backgroundColor: "#00E6C2",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 10,
   },
+
   headerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 55,
+    height: 55,
+    borderRadius: 28,
     backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  headerLetter: { color: "#007AFF", fontWeight: "700", fontSize: 20 },
-  title: { color: "#fff", fontSize: 22, fontWeight: "700" },
-  subtitle: { color: "#fff", opacity: 0.9, marginTop: 2 },
-
-  logoutButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-
-  logoutText: {
-    color: "#ffffff", // ← FIXED!
-    fontSize: 15,
-    fontWeight: "700",
-  },
-
-  userRow: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    padding: 14,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#007AFF",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
-  avatarLetter: { color: "#fff", fontWeight: "700", fontSize: 18 },
 
-  info: { flex: 1 },
-  infoTop: { flexDirection: "row", justifyContent: "space-between" },
-  name: { fontWeight: "700", fontSize: 16 },
-  time: { color: "#888", fontSize: 12 },
+  headerLetter: { color: "#00A38C", fontWeight: "800", fontSize: 22 },
+  headerSub: { color: "#003E36", fontSize: 14 },
+  headerTitle: { fontSize: 22, fontWeight: "900", color: "#003E36" },
+  logoutButton: { marginLeft: "auto" },
+  logoutText: { fontSize: 28 },
 
-  infoBottom: {
+  chatCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    marginHorizontal: 14,
+    marginTop: 12,
+    borderRadius: 22,
+    elevation: 3,
   },
-  preview: { color: "#666", flex: 1 },
 
-  badge: {
-    backgroundColor: "#007AFF",
-    borderRadius: 12,
-    minWidth: 22,
-    height: 22,
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#00C9A7",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
-    marginLeft: 8,
+    marginRight: 14,
   },
-  badgeText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+
+  avatarLetter: { color: "#fff", fontWeight: "900", fontSize: 18 },
+  rowTop: { flexDirection: "row", justifyContent: "space-between" },
+  name: { fontSize: 16, fontWeight: "700", color: "#003E36" },
+  time: { fontSize: 12, color: "#777" },
+  rowBottom: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
+  preview: { flex: 1, color: "#666" },
+
+  badge: {
+    backgroundColor: "#00C9A7",
+    minWidth: 24,
+    height: 24,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+
+  badgeText: { fontWeight: "800", color: "#fff", fontSize: 12 },
+  empty: { textAlign: "center", marginTop: 35, fontSize: 16, color: "#888" },
 });
