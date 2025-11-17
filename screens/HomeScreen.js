@@ -1,3 +1,4 @@
+// screens/HomeScreen.js
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -8,24 +9,26 @@ import {
   RefreshControl,
   ActivityIndicator,
   Image,
-  TextInput
+  Alert,
 } from "react-native";
 
 export default function HomeScreen({ navigation, route, db }) {
+  // route.params.currentUser is set when navigating from Login/Register or replaced
   const currentUser = route.params?.currentUser || null;
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState("");
 
   useEffect(() => {
+    // If currentUser is not provided, navigate back to Login
     if (!currentUser) {
       navigation.replace("Login");
       return;
     }
 
     const unsub = navigation.addListener("focus", () => {
+      // reload every time screen is focused (so profile updates reflect)
       loadUsers();
     });
 
@@ -52,11 +55,8 @@ export default function HomeScreen({ navigation, route, db }) {
              ORDER BY timestamp DESC LIMIT 1`,
             [currentUser.id, u.id, u.id, currentUser.id]
           );
-
           const unread = await db.getFirstAsync(
-            `SELECT COUNT(*) AS count 
-             FROM messages 
-             WHERE senderId = ? AND receiverId = ? AND isRead = 0`,
+            `SELECT COUNT(*) AS count FROM messages WHERE senderId = ? AND receiverId = ? AND isRead = 0`,
             [u.id, currentUser.id]
           );
 
@@ -88,6 +88,21 @@ export default function HomeScreen({ navigation, route, db }) {
     navigation.navigate("Chat", { currentUser, chatUser: user });
   };
 
+  const openProfile = () => {
+    navigation.navigate("Profile", { currentUser });
+  };
+
+  const logout = () => {
+    Alert.alert("Logout", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: () => navigation.replace("Login"),
+      },
+    ]);
+  };
+
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     const d = new Date(timestamp);
@@ -102,17 +117,15 @@ export default function HomeScreen({ navigation, route, db }) {
     return days === 1 ? "Yesterday" : `${days}d ago`;
   };
 
-  const filteredUsers = users.filter((u) =>
-    u.fullName.toLowerCase().includes(search.toLowerCase())
-  );
-
   const renderItem = ({ item }) => (
     <TouchableOpacity style={styles.userRow} onPress={() => openChat(item)}>
       {item.profilePhoto ? (
         <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
       ) : (
         <View style={styles.avatar}>
-          <Text style={styles.avatarLetter}>{item.fullName[0].toUpperCase()}</Text>
+          <Text style={styles.avatarLetter}>
+            {item.fullName.charAt(0).toUpperCase()}
+          </Text>
         </View>
       )}
 
@@ -150,38 +163,45 @@ export default function HomeScreen({ navigation, route, db }) {
 
   return (
     <View style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
-        {currentUser.profilePhoto ? (
-          <Image source={{ uri: currentUser.profilePhoto }} style={styles.headerAvatar} />
-        ) : (
-          <View style={styles.headerAvatar}>
-            <Text style={styles.headerLetter}>{currentUser.fullName[0].toUpperCase()}</Text>
-          </View>
-        )}
+        <TouchableOpacity onPress={openProfile}>
+          {currentUser.profilePhoto ? (
+            <Image
+              source={{ uri: currentUser.profilePhoto }}
+              style={styles.headerAvatar}
+            />
+          ) : (
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerLetter}>
+                {currentUser.fullName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.subtitle}>Welcome,</Text>
-          <Text style={styles.title}>{currentUser.fullName}</Text>
+        <View style={{ flex: 1, marginLeft: 12 }}>          
+          <Text style={styles.subtitle}>Welcome, {currentUser.fullName}</Text>
+          <Text style={styles.title}>Messages</Text>
         </View>
-      </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchBox}>
-        <TextInput
-          placeholder="Search users..."
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-        />
+        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={filteredUsers}
+        data={users}
         renderItem={renderItem}
         keyExtractor={(i) => i.id.toString()}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={{ padding: 40, alignItems: "center" }}>
+            <Text style={{ color: "#777" }}>No other users found</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -199,24 +219,29 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     paddingHorizontal: 18,
   },
-
   headerAvatar: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: "#fff",
-    justifyContent: "center", alignItems: "center",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   headerLetter: { color: "#007AFF", fontWeight: "700", fontSize: 20 },
   title: { color: "#fff", fontSize: 22, fontWeight: "700" },
-  subtitle: { color: "#fff", opacity: 0.8, fontSize: 14 },
+  subtitle: { color: "#fff", opacity: 0.9, marginTop: 2 },
 
-  searchBox: {
-    backgroundColor: "white",
-    margin: 12,
-    padding: 10,
-    borderRadius: 10,
+  logoutButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
 
-  searchInput: { fontSize: 16 },
+  logoutText: {
+    color: "#ffffff", // ← FIXED!
+    fontSize: 15,
+    fontWeight: "700",
+  },
 
   userRow: {
     flexDirection: "row",
@@ -225,13 +250,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#eee",
   },
-
   avatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: "#007AFF",
-    justifyContent: "center", alignItems: "center", marginRight: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
-
   avatarLetter: { color: "#fff", fontWeight: "700", fontSize: 18 },
+
   info: { flex: 1 },
   infoTop: { flexDirection: "row", justifyContent: "space-between" },
   name: { fontWeight: "700", fontSize: 16 },
@@ -242,7 +271,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 6,
   },
-
   preview: { color: "#666", flex: 1 },
 
   badge: {
@@ -255,6 +283,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginLeft: 8,
   },
-
   badgeText: { color: "#fff", fontWeight: "700", fontSize: 12 },
 });

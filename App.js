@@ -1,19 +1,18 @@
 // App.js
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { createDatabase } from "./database/messengerApp";
+import { createDatabase } from './database/messengerApp';
 
 // Screens
-import LoginScreen from "./screens/LoginScreen";
-import RegisterScreen from "./screens/RegisterScreen";
-import HomeScreen from "./screens/HomeScreen";
-import ChatScreen from "./screens/ChatScreen";
-import ProfileScreen from "./screens/ProfileScreen";
-import TabsNavigator from "./screens/TabsNavigator";
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
+import HomeScreen from './screens/HomeScreen';
+import ChatScreen from './screens/ChatScreen';
+import ProfileScreen from './screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -36,7 +35,7 @@ export default function App() {
   // Loading Screen while DB initializes
   if (!db) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
@@ -45,6 +44,7 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
+
         {/* LOGIN */}
         <Stack.Screen name="Login">
           {(props) => <LoginScreen {...props} db={db} />}
@@ -55,9 +55,9 @@ export default function App() {
           {(props) => <RegisterScreen {...props} db={db} />}
         </Stack.Screen>
 
-        {/* NEW - Tabs Navigator */}
-        <Stack.Screen name="Tabs">
-          {(props) => <TabsNavigator {...props} db={db} />}
+        {/* HOME SCREEN */}
+        <Stack.Screen name="Home">
+          {(props) => <HomeScreen {...props} db={db} />}
         </Stack.Screen>
 
         {/* CHAT WINDOW */}
@@ -69,6 +69,7 @@ export default function App() {
         <Stack.Screen name="Profile">
           {(props) => <ProfileScreen {...props} db={db} />}
         </Stack.Screen>
+
       </Stack.Navigator>
     </NavigationContainer>
   );

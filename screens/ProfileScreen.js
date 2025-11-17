@@ -18,12 +18,20 @@ export default function ProfileScreen({ navigation, route, db }) {
   const { currentUser } = route.params;
 
   const [fullName, setFullName] = useState(currentUser.fullName || "");
-  const [profilePhoto, setProfilePhoto] = useState(
-    currentUser.profilePhoto || null
-  );
+  const [profilePhoto, setProfilePhoto] = useState(currentUser.profilePhoto || null);
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
-  const [loading, setLoading] = useState(false);
+
+  // ----------------------------------------------------------
+  // 📌 New: When clicking "Save Photo" → ask Camera or Gallery
+  // ----------------------------------------------------------
+  const chooseImageMethod = () => {
+    Alert.alert("Change Photo", "Select option", [
+      { text: "📁 Gallery", onPress: pickImage },
+      { text: "📷 Take Selfie", onPress: takeSelfie },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
 
   const pickImage = async () => {
     try {
@@ -34,8 +42,8 @@ export default function ProfileScreen({ navigation, route, db }) {
         quality: 0.6,
       });
       if (!res.canceled) setProfilePhoto(res.assets[0].uri);
-    } catch (err) {
-      Alert.alert("Error", "Could not open gallery");
+    } catch {
+      Alert.alert("Error", "Failed to select from gallery");
     }
   };
 
@@ -47,106 +55,75 @@ export default function ProfileScreen({ navigation, route, db }) {
         quality: 0.6,
       });
       if (!res.canceled) setProfilePhoto(res.assets[0].uri);
-    } catch (err) {
-      Alert.alert("Error", "Could not open camera");
+    } catch {
+      Alert.alert("Error", "Camera not available");
     }
   };
 
   const saveProfilePhoto = async () => {
-    setLoading(true);
-    try {
-      await db.runAsync("UPDATE users SET profilePhoto = ? WHERE id = ?", [
-        profilePhoto || null,
-        currentUser.id,
-      ]);
-      const updated = await db.getFirstAsync(
-        "SELECT * FROM users WHERE id = ?",
-        [currentUser.id]
-      );
-      Alert.alert("Success", "Profile picture updated!");
-      navigation.replace("Home", { currentUser: updated });
-    } catch (err) {
-      Alert.alert("Error", "Could not save profile photo.");
-    } finally {
-      setLoading(false);
-    }
+    if (!profilePhoto) return Alert.alert("No Image", "Please take or select a photo first.");
+
+    await db.runAsync("UPDATE users SET profilePhoto = ? WHERE id = ?", [
+      profilePhoto,
+      currentUser.id,
+    ]);
+
+    const updated = await db.getFirstAsync("SELECT * FROM users WHERE id = ?", [
+      currentUser.id,
+    ]);
+
+    Alert.alert("Success", "Profile picture updated!");
+    navigation.replace("Profile", { currentUser: updated });
   };
 
   const saveFullName = async () => {
     if (!fullName.trim()) return Alert.alert("Error", "Name cannot be empty");
 
-    setLoading(true);
-    try {
-      await db.runAsync("UPDATE users SET fullName = ? WHERE id = ?", [
-        fullName.trim(),
-        currentUser.id,
-      ]);
-      const updated = await db.getFirstAsync(
-        "SELECT * FROM users WHERE id = ?",
-        [currentUser.id]
-      );
-      Alert.alert("Success", "Name updated");
-      navigation.replace("Home", { currentUser: updated });
-    } catch (err) {
-      Alert.alert("Error", "Could not update name");
-    } finally {
-      setLoading(false);
-    }
+    await db.runAsync("UPDATE users SET fullName = ? WHERE id = ?", [
+      fullName.trim(),
+      currentUser.id,
+    ]);
+
+    const updated = await db.getFirstAsync("SELECT * FROM users WHERE id = ?", [
+      currentUser.id,
+    ]);
+
+    Alert.alert("Success", "Name updated");
+    navigation.replace("Profile", { currentUser: updated });
   };
 
   const changePassword = async () => {
     if (!oldPass || !newPass)
       return Alert.alert("Error", "Please fill both fields");
     if (oldPass !== currentUser.password)
-      return Alert.alert("Error", "Old password is incorrect");
+      return Alert.alert("Error", "Old password incorrect");
     if (newPass.length < 4)
-      return Alert.alert("Error", "Password must be at least 4 characters");
+      return Alert.alert("Error", "Password too short");
 
-    setLoading(true);
-    try {
-      await db.runAsync("UPDATE users SET password = ? WHERE id = ?", [
-        newPass,
-        currentUser.id,
-      ]);
-      const updated = await db.getFirstAsync(
-        "SELECT * FROM users WHERE id = ?",
-        [currentUser.id]
-      );
-      Alert.alert("Success", "Password updated!");
-      setOldPass("");
-      setNewPass("");
-      navigation.replace("Home", { currentUser: updated });
-    } catch (err) {
-      Alert.alert("Error", "Could not update password");
-    } finally {
-      setLoading(false);
-    }
+    await db.runAsync("UPDATE users SET password = ? WHERE id = ?", [
+      newPass,
+      currentUser.id,
+    ]);
+
+    Alert.alert("Success", "Password updated");
+    setOldPass("");
+    setNewPass("");
   };
 
   const deleteAccount = () => {
-    Alert.alert("Confirm Delete", "Delete your account permanently?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert("Delete Account", "Are you sure?", [
+      { text: "Cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
-          setLoading(true);
-          try {
-            await db.runAsync(
-              "DELETE FROM messages WHERE senderId = ? OR receiverId = ?",
-              [currentUser.id, currentUser.id]
-            );
-            await db.runAsync("DELETE FROM users WHERE id = ?", [
-              currentUser.id,
-            ]);
-
-            Alert.alert("Deleted", "Your account has been deleted");
-            navigation.replace("Login");
-          } catch (err) {
-            Alert.alert("Error", "Could not delete account.");
-          } finally {
-            setLoading(false);
-          }
+          await db.runAsync(
+            "DELETE FROM messages WHERE senderId = ? OR receiverId = ?",
+            [currentUser.id, currentUser.id]
+          );
+          await db.runAsync("DELETE FROM users WHERE id = ?", [currentUser.id]);
+          Alert.alert("Deleted", "Your account has been removed");
+          navigation.replace("Login");
         },
       },
     ]);
@@ -158,50 +135,33 @@ export default function ProfileScreen({ navigation, route, db }) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.centerContent}>
+        
         {/* Back Button */}
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
 
         <Text style={styles.title}>My Profile</Text>
 
-        {/* Profile Photo */}
-        <View style={styles.photoSection}>
+        {/* Profile Image */}
+        <TouchableOpacity onPress={chooseImageMethod}>
           {profilePhoto ? (
             <Image source={{ uri: profilePhoto }} style={styles.photo} />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoLetter}>
-                {currentUser.fullName.charAt(0).toUpperCase()}
-              </Text>
+              <Text style={styles.photoLetter}>{currentUser.fullName[0].toUpperCase()}</Text>
             </View>
           )}
+        </TouchableOpacity>
 
-          <View style={styles.photoButtons}>
-            <TouchableOpacity style={styles.photoBtn} onPress={pickImage}>
-              <Text style={styles.photoBtnText}>📁 Gallery</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.photoBtn} onPress={takeSelfie}>
-              <Text style={styles.photoBtnText}>📸 Selfie</Text>
-            </TouchableOpacity>
-          </View>
+        <TouchableOpacity style={styles.saveBtn} onPress={saveProfilePhoto}>
+          <Text style={styles.saveText}>Save Photo</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity style={styles.saveBtn} onPress={saveProfilePhoto}>
-            <Text style={styles.saveText}>Save Photo</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Name Section */}
+        {/* Name Field */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Full Name</Text>
-          <TextInput
-            style={styles.input}
-            value={fullName}
-            onChangeText={setFullName}
-          />
+          <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
           <TouchableOpacity style={styles.saveBtn} onPress={saveFullName}>
             <Text style={styles.saveText}>Update Name</Text>
           </TouchableOpacity>
@@ -210,171 +170,140 @@ export default function ProfileScreen({ navigation, route, db }) {
         {/* Password Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Change Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Old password"
-            secureTextEntry
-            value={oldPass}
-            onChangeText={setOldPass}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="New password"
-            secureTextEntry
-            value={newPass}
-            onChangeText={setNewPass}
-          />
+          <TextInput placeholder="Old password" secureTextEntry value={oldPass} onChangeText={setOldPass} style={styles.input} />
+          <TextInput placeholder="New password" secureTextEntry value={newPass} onChangeText={setNewPass} style={styles.input} />
           <TouchableOpacity style={styles.saveBtn} onPress={changePassword}>
             <Text style={styles.saveText}>Update Password</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Delete Account */}
         <TouchableOpacity style={styles.deleteBtn} onPress={deleteAccount}>
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+// ------------------- UI Improvement (only styling changed) -------------------
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#fff" 
+  container: {
+    flex: 1,
+    backgroundColor: "#F7F9FC",
   },
 
-  // FULL CENTER CONTENT (Y + X centered)
   centerContent: {
-    flexGrow: 1,
-    justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 25,
+    paddingBottom: 50,
+    paddingTop: 110,
   },
 
   backButton: {
-    alignSelf: "flex-start",
-    marginBottom: 15,
+    position: "absolute",
+    top: 55,
+    left: 20,
+    zIndex: 999,
   },
-  backText: { 
-    fontSize: 18, 
+  backText: {
+    fontSize: 18,
     color: "#007AFF",
-    fontWeight: "500"
+    fontWeight: "600",
   },
 
   title: {
     fontSize: 28,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#007AFF",
-    marginBottom: 25,
-    textAlign: "center",
-  },
-
-  /** PROFILE PHOTO SECTION **/
-  photoSection: {
-    alignItems: "center",
-    marginBottom: 35,
+    marginBottom: 20,
   },
 
   photo: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 130,
+    height: 130,
+    borderRadius: 70,
     borderWidth: 3,
     borderColor: "#007AFF",
-    backgroundColor: "#eee",
+    marginBottom: 10,
+    backgroundColor: "#E4EAF2",
   },
 
   photoPlaceholder: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: "#bbb",
+    width: 130,
+    height: 130,
+    borderRadius: 70,
+    backgroundColor: "#DCE4ED",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#007AFF",
   },
 
   photoLetter: {
-    fontSize: 48,
-    color: "#fff",
-    fontWeight: "700",
+    fontSize: 52,
+    fontWeight: "900",
+    color: "#007AFF",
   },
 
-  photoButtons: {
-    flexDirection: "row",
-    marginTop: 15,
-  },
-
-  photoBtn: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 10,
-    paddingHorizontal: 22,
-    borderRadius: 10,
-    marginHorizontal: 6,
-    elevation: 2,
-  },
-
-  photoBtnText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-
+  // Save button (for photo + name + password)
   saveBtn: {
-    backgroundColor: "#34C759",
+    backgroundColor: "#007AFF",
     paddingVertical: 12,
-    paddingHorizontal: 35,
-    borderRadius: 10,
-    marginTop: 18,
-    elevation: 2,
+    paddingHorizontal: 40,
+    borderRadius: 12,
+    marginTop: 10,
   },
 
   saveText: {
     color: "#fff",
     fontWeight: "700",
     textAlign: "center",
-    fontSize: 15,
-  },
-
-  /** INPUT SECTIONS **/
-  section: {
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 30,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#333",
-    marginBottom: 12,
-  },
-
-  input: {
-    width: "92%",
-    padding: 14,
     fontSize: 16,
-    borderRadius: 10,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    backgroundColor: "#fafafa",
-    marginBottom: 10,
   },
 
-  /** DELETE BUTTON **/
-  deleteBtn: {
-    backgroundColor: "red",
-    paddingVertical: 14,
-    paddingHorizontal: 35,
-    borderRadius: 12,
-    marginTop: 15,
+  /** Profile Card Sections */
+  section: {
+    width: "85%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 18,
+    marginTop: 20,
     elevation: 3,
   },
 
-  deleteText: {
-    color: "#fff",
-    fontWeight: "700",
-    textAlign: "center",
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+  },
+
+  input: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#D4D6DB",
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#F9FAFB",
+    marginBottom: 12,
     fontSize: 15,
   },
+
+  deleteBtn: {
+    backgroundColor: "#FF3B30",
+    width: "80%",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 35,
+    elevation: 4,
+  },
+
+  deleteText: {
+    textAlign: "center",
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
 });
+
