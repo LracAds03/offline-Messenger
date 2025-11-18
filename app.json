@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Offline Messenger",
-    "slug": "Romanda_C",
+    "name": "Romanda_C",
+    "slug": "offline-messenger",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,10 +16,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#007AFF"
       },
-      "package": "com.offlinemessenger.app"
+      "package": "com.romanda.c_finalproject"
     },
     "ios": {
-      "bundleIdentifier": "com.offlinemessenger.app"
+      "bundleIdentifier": "com.romanda.c_finalproject"
     },
     "web": {
       "favicon": "./assets/favicon.png"
