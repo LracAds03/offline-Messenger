@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, KeyboardAvoidingView, Platform
-} from 'react-native';
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 
 export default function LoginScreen({ navigation, db }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter username and password');
+      Alert.alert("Error", "Please enter username and password");
       return;
     }
 
@@ -19,19 +25,23 @@ export default function LoginScreen({ navigation, db }) {
 
     try {
       const user = await db.getFirstAsync(
-        'SELECT * FROM users WHERE username = ? AND password = ?',
+        "SELECT * FROM users WHERE username = ? AND password = ?",
         [username.trim().toLowerCase(), password]
       );
 
       if (user) {
-        Alert.alert('Success', `Welcome back, ${user.fullName}!`);
-        navigation.replace("Home", { currentUser: user });
-      } else {
-        Alert.alert('Error', 'Invalid username or password');
-      }
+        Alert.alert("Success", `Welcome back, ${user.fullName}!`);
 
+        // 🔥 FIX: Prevent going back to previous logged-in user
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Home", params: { currentUser: user, db } }],
+        });
+      } else {
+        Alert.alert("Error", "Invalid username or password");
+      }
     } catch (error) {
-      Alert.alert('Error', 'Login failed.');
+      Alert.alert("Error", "Login failed.");
       console.log("Login Error:", error);
     }
 
@@ -39,11 +49,11 @@ export default function LoginScreen({ navigation, db }) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.content}>
-
         <Text style={styles.logo}>💬</Text>
         <Text style={styles.title}>Offline Messenger</Text>
         <Text style={styles.subtitle}>Welcome back 👋</Text>

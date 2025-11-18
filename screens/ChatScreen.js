@@ -13,8 +13,8 @@ import {
   Modal,
 } from "react-native";
 
-export default function ChatScreen({ navigation, route, db }) {
-  const { currentUser, chatUser } = route.params;
+export default function ChatScreen({ navigation, route }) {
+  const { currentUser, chatUser, db } = route.params;
 
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -68,8 +68,8 @@ export default function ChatScreen({ navigation, route, db }) {
 
     try {
       await db.runAsync(
-        `INSERT INTO messages (senderId, receiverId, message, timestamp)
-       VALUES (?, ?, ?, datetime('now','localtime'))`,
+        `INSERT INTO messages (senderId, receiverId, message, timestamp, isRead)
+         VALUES (?, ?, ?, datetime('now','localtime'), 0)`,
         [currentUser.id, chatUser.id, text.trim()]
       );
 
@@ -97,10 +97,16 @@ export default function ChatScreen({ navigation, route, db }) {
     return d.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
+  // 🔥 Identify last message YOU sent
+  const lastMyMessageId =
+    messages.filter((m) => m.senderId === currentUser.id).slice(-1)[0]?.id || null;
+
   const renderItem = ({ item, index }) => {
     const isMe = item.senderId === currentUser.id;
     const prev = index > 0 ? messages[index - 1] : null;
     const showDate = !prev || formatDate(prev.timestamp) !== formatDate(item.timestamp);
+
+    const isLastMyMessage = isMe && item.id === lastMyMessageId;
 
     return (
       <>
@@ -118,6 +124,13 @@ export default function ChatScreen({ navigation, route, db }) {
             <Text style={[styles.msgTime, isMe ? styles.timeMe : styles.timeThem]}>
               {formatTime(item.timestamp)}
             </Text>
+
+            {/* 👀 SEEN / UNREAD STATUS */}
+            {isLastMyMessage && (
+              <Text style={styles.msgStatus}>
+                {item.isRead ? "Seen" : "Unread"}
+              </Text>
+            )}
           </View>
         </View>
       </>
@@ -146,7 +159,7 @@ export default function ChatScreen({ navigation, route, db }) {
         <Text style={styles.headerName}>{chatUser.fullName}</Text>
       </View>
 
-      {/* IMAGE POPUP */}
+      {/* IMAGE ZOOM */}
       <Modal visible={showImageModal} transparent animationType="fade">
         <TouchableOpacity style={styles.modalContainer} onPress={() => setShowImageModal(false)}>
           {chatUser.profilePhoto ? (
@@ -159,7 +172,7 @@ export default function ChatScreen({ navigation, route, db }) {
         </TouchableOpacity>
       </Modal>
 
-      {/* CHAT LIST */}
+      {/* MESSAGES */}
       <FlatList
         ref={flatRef}
         data={messages}
@@ -259,6 +272,14 @@ const styles = StyleSheet.create({
   timeMe: { color: "#E2FFF9", textAlign: "right" },
   timeThem: { color: "#666" },
 
+  msgStatus: {
+    fontSize: 11,
+    marginTop: 3,
+    textAlign: "right",
+    color: "#DFFFEF",
+    fontStyle: "italic",
+  },
+
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -297,7 +318,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  modalImage: { width: 300, height: 300, borderRadius: 150, borderWidth: 3, borderColor: "#fff" },
+  modalImage: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
 
   modalPlaceholder: {
     width: 300,
